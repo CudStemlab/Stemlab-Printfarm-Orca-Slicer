@@ -386,6 +386,11 @@ private:
     static const char* clipboard_get(void* user_data);
     static void clipboard_set(void* user_data, const char* text);
 
+    // Automation recording: appends the most-recently-drawn ImGui item to the
+    // automation item table. No-op (single bool check) when automation is disabled.
+    void automation_record_last_item(const char* type, const std::string& label,
+                                     bool has_value, const std::string& value);
+
     LastSliderStatus m_last_slider_status;
     ImFont* default_font = nullptr;
     ImFont* bold_font = nullptr;

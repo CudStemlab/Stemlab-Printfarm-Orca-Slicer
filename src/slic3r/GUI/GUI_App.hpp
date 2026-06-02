@@ -238,6 +238,7 @@ private:
     bool            m_initialized { false };
     bool            m_post_initialized { false };
     bool            m_app_conf_exists{ false };
+    int             m_automation_port { 0 };  // UI automation: 0 = off; set by Task 17 from CLI
     EAppMode        m_app_mode{ EAppMode::Editor };
     bool            m_is_recreating_gui{ false };
 #ifdef __linux__
@@ -364,6 +365,12 @@ public:
     FilamentColorCodeQuery* get_filament_color_code_query();
     bool is_editor() const { return m_app_mode == EAppMode::Editor; }
     bool is_gcode_viewer() const { return m_app_mode == EAppMode::GCodeViewer; }
+
+    // UI automation: true once a TCP port has been assigned (via CLI). When false,
+    // every automation recording hook short-circuits to a single bool check.
+    // NOTE: Task 17 extends the automation lifecycle (server/backend) around this
+    // accessor; here we only add the minimal flag/accessor the hooks depend on.
+    bool is_automation_enabled() const { return m_automation_port > 0; }
     bool is_recreating_gui() const { return m_is_recreating_gui; }
     std::string logo_name() const { return is_editor() ? "OrcaSlicer" : "OrcaSlicer-gcodeviewer"; }
 

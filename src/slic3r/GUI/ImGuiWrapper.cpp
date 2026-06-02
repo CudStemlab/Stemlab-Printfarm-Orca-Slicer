@@ -37,6 +37,7 @@
 #include "Search.hpp"
 #include "BitmapCache.hpp"
 #include "GUI_App.hpp"
+#include "slic3r/GUI/Automation/ImGuiItemTable.hpp"
 
 #include "../Utils/MacDarkMode.hpp"
 #include <nanosvg/nanosvg.h>
@@ -570,11 +571,44 @@ void ImGuiWrapper::new_frame()
     // BBL: end copy & paste
 }
 
+void ImGuiWrapper::automation_record_last_item(const char* type, const std::string& label,
+                                               bool has_value, const std::string& value) {
+    if (!wxGetApp().is_automation_enabled())
+        return;
+    using namespace Slic3r::GUI::Automation;
+    const ImVec2 mn = ImGui::GetItemRectMin();
+    const ImVec2 mx = ImGui::GetItemRectMax();
+    ImGuiItemRecord rec;
+    ImGuiContext* ctx = ImGui::GetCurrentContext();
+    rec.window_name = (ctx && ctx->CurrentWindow) ? ctx->CurrentWindow->Name : "";
+    rec.label   = label;
+    rec.type    = type;
+    rec.x = mn.x; rec.y = mn.y; rec.w = mx.x - mn.x; rec.h = mx.y - mn.y;
+    rec.enabled = true; // v1: precise per-item disabled-state read is non-trivial across ImGui versions
+    rec.has_value = has_value;
+    rec.value     = value;
+    ImGuiItemTable::instance().record_item(std::move(rec));
+}
+
 void ImGuiWrapper::render()
 {
     ImGui::Render();
     render_draw_data(ImGui::GetDrawData());
     m_new_frame_open = false;
+
+    if (wxGetApp().is_automation_enabled()) {
+        using namespace Slic3r::GUI::Automation;
+        ImGuiContext& g = *ImGui::GetCurrentContext();
+        for (ImGuiWindow* w : g.Windows) {
+            if (w == nullptr) continue;
+            ImGuiWindowRecord wr;
+            wr.name = w->Name ? w->Name : "";
+            wr.x = w->Pos.x; wr.y = w->Pos.y; wr.w = w->Size.x; wr.h = w->Size.y;
+            wr.visible = w->Active && !w->Hidden;
+            ImGuiItemTable::instance().record_window(std::move(wr));
+        }
+        ImGuiItemTable::instance().swap_frame();
+    }
 }
 
 ImVec2 ImGuiWrapper::calc_text_size(std::string_view text,
@@ -870,6 +904,7 @@ bool ImGuiWrapper::button(const wxString &label, const wxString& tooltip)
 {
     auto label_utf8 = into_u8(label);
     const bool ret = ImGui::Button(label_utf8.c_str());
+    automation_record_last_item("button", label_utf8, false, {});
 
     if (!tooltip.IsEmpty() && ImGui::IsItemHovered()) {
         const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
@@ -883,6 +918,7 @@ bool ImGuiWrapper::bbl_button(const wxString &label, const wxString& tooltip)
 {
     auto label_utf8 = into_u8(label);
     const bool ret = ImGui::BBLButton(label_utf8.c_str());
+    automation_record_last_item("button", label_utf8, false, {});
 
     if (!tooltip.IsEmpty() && ImGui::IsItemHovered()) {
         const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
@@ -960,7 +996,9 @@ bool ImGuiWrapper::glyph_button(wchar_t icon_char, ImVec2 icon_size)
 bool ImGuiWrapper::radio_button(const wxString &label, bool active)
 {
     auto label_utf8 = into_u8(label);
-    return ImGui::RadioButton(label_utf8.c_str(), active);
+    const bool ret = ImGui::RadioButton(label_utf8.c_str(), active);
+    automation_record_last_item("radio", label_utf8, true, active ? "true" : "false");
+    return ret;
 }
 
 ImVec4 ImGuiWrapper::to_ImVec4(const ColorRGB &color) {
@@ -969,7 +1007,11 @@ ImVec4 ImGuiWrapper::to_ImVec4(const ColorRGB &color) {
 
 bool ImGuiWrapper::input_double(const std::string &label, const double &value, const std::string &format)
 {
-    return ImGui::InputDouble(label.c_str(), const_cast<double*>(&value), 0.0f, 0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal);
+    const bool ret = ImGui::InputDouble(label.c_str(), const_cast<double*>(&value), 0.0f, 0.0f, format.c_str(), ImGuiInputTextFlags_CharsDecimal);
+    char value_buf[64];
+    snprintf(value_buf, sizeof(value_buf), format.c_str(), value);
+    automation_record_last_item("input", label, true, value_buf);
+    return ret;
 }
 
 bool ImGuiWrapper::input_double(const wxString &label, const double &value, const std::string &format)
@@ -1000,7 +1042,9 @@ bool ImGuiWrapper::input_vec3(const std::string &label, const Vec3d &value, floa
 bool ImGuiWrapper::checkbox(const wxString &label, bool &value)
 {
     auto label_utf8 = into_u8(label);
-    return ImGui::Checkbox(label_utf8.c_str(), &value);
+    const bool ret = ImGui::Checkbox(label_utf8.c_str(), &value);
+    automation_record_last_item("checkbox", label_utf8, true, value ? "true" : "false");
+    return ret;
 }
 
 bool ImGuiWrapper::bbl_checkbox(const wxString &label, bool &value)
@@ -1014,6 +1058,7 @@ bool ImGuiWrapper::bbl_checkbox(const wxString &label, bool &value)
     }
     auto label_utf8 = into_u8(label);
     result          = ImGui::BBLCheckbox(label_utf8.c_str(), &value);
+    automation_record_last_item("checkbox", label_utf8, true, value ? "true" : "false");
 
     if (b_value) { ImGui::PopStyleColor(3);}
     return result;
@@ -1147,6 +1192,11 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
         str_label = str_label.substr(0, pos) + str_label.substr(pos + 2);
 
     bool ret = ImGui::SliderFloat(str_label.c_str(), v, v_min, v_max, format, power);
+    {
+        char value_buf[64];
+        snprintf(value_buf, sizeof(value_buf), format, v ? *v : 0.0f);
+        automation_record_last_item("slider", label, true, value_buf);
+    }
 
     m_last_slider_status.hovered = ImGui::IsItemHovered();
     m_last_slider_status.edited = ImGui::IsItemEdited();
@@ -1324,6 +1374,10 @@ bool ImGuiWrapper::combo(const std::string& label, const std::vector<std::string
     }
 
     selection = selection_out;
+    {
+        const std::string current_value = (selection >= 0 && selection < int(options.size())) ? options[selection] : std::string();
+        automation_record_last_item("combo", label, true, current_value);
+    }
     return res;
 }
 
