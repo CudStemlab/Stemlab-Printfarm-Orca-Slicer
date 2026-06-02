@@ -27,6 +27,10 @@ std::vector<const UiNode*> flatten(const UiNode& root);
 // All nodes matching the target spec (resolution-order aware).
 std::vector<const UiNode*> find_matches(const UiNode& root, const Target& target);
 
+// Resolve to exactly one node for actions. Returns the node on a unique match;
+// returns nullptr otherwise and sets match_count (0 = not found, >1 = ambiguous).
+const UiNode* resolve_unique(const UiNode& root, const Target& target, int& match_count);
+
 enum class WaitState { Exists, Visible, Enabled, Value };
 
 // True if `node` satisfies the wait condition. A null node only satisfies a

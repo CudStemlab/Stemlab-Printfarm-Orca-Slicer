@@ -90,3 +90,34 @@ TEST_CASE("find_matches not found returns empty", "[automation][locator]") {
     Target t; t.id = "nope";
     CHECK(find_matches(tree, t).empty());
 }
+
+TEST_CASE("resolve_unique success / not-found / ambiguous",
+          "[automation][locator]") {
+    const auto tree = make_tree();
+    int count = -1;
+
+    Target ok; ok.id = "btn_slice";
+    CHECK(resolve_unique(tree, ok, count) != nullptr);
+    CHECK(count == 1);
+
+    Target missing; missing.id = "nope";
+    CHECK(resolve_unique(tree, missing, count) == nullptr);
+    CHECK(count == 0);
+
+    Target ambiguous; ambiguous.label = "Export";
+    CHECK(resolve_unique(tree, ambiguous, count) == nullptr);
+    CHECK(count == 2);
+}
+
+TEST_CASE("evaluate_state covers exists/visible/enabled/value",
+          "[automation][locator]") {
+    UiNode n; n.visible = true; n.enabled = false;
+    n.has_value = true; n.value = "PLA";
+
+    CHECK(evaluate_state(&n, WaitState::Exists,  std::nullopt));
+    CHECK(evaluate_state(&n, WaitState::Visible, std::nullopt));
+    CHECK_FALSE(evaluate_state(&n, WaitState::Enabled, std::nullopt)); // disabled
+    CHECK(evaluate_state(&n, WaitState::Value, std::string("PLA")));
+    CHECK_FALSE(evaluate_state(&n, WaitState::Value, std::string("ABS")));
+    CHECK_FALSE(evaluate_state(nullptr, WaitState::Exists, std::nullopt));
+}

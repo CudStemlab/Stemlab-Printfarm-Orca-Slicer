@@ -45,6 +45,12 @@ std::vector<const UiNode*> find_matches(const UiNode& root, const Target& target
     return out;
 }
 
+const UiNode* resolve_unique(const UiNode& root, const Target& target, int& match_count) {
+    const auto m = find_matches(root, target);
+    match_count = static_cast<int>(m.size());
+    return m.size() == 1 ? m.front() : nullptr;
+}
+
 bool evaluate_state(const UiNode* node, WaitState state,
                     const std::optional<std::string>& expected_value) {
     if (node == nullptr)
