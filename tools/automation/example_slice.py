@@ -27,7 +27,6 @@ def main() -> int:
         args.orca,
         "--automation-server",
         f"--automation-server-port={args.port}",
-        args.model,
     ])
     try:
         orca = OrcaClient(port=args.port)
@@ -43,7 +42,10 @@ def main() -> int:
             print("ERROR: automation server did not start", file=sys.stderr)
             return 1
 
-        # Wait until the project (model) is loaded.
+        # Load the model into the already-running instance, then wait until the
+        # project reports loaded. file.open is synchronous, so project_loaded is
+        # already true on return; the wait is a belt-and-suspenders guard.
+        orca.open([args.model])
         deadline = time.time() + 30
         while time.time() < deadline:
             if orca.app_state().get("project_loaded"):
