@@ -59,8 +59,9 @@ jobs:
 
       - name: Install codegen tools and generate config sources
         run: |
-          pip3 install grpcio-tools
-          python3 tools/run_codegen.py
+          python3 -m venv /tmp/codegen_venv
+          /tmp/codegen_venv/bin/pip install grpcio-tools
+          /tmp/codegen_venv/bin/python tools/run_codegen.py
         if: runner.os != 'Windows'
         shell: bash
 
