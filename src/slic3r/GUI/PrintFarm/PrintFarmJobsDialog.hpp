@@ -6,9 +6,13 @@
 // job queue, with manual + automatic refresh, and an "Upload to Farm" action that
 // pushes a sliced file to a selected printer via the abstraction layer.
 
+#include <vector>
+
 #include <wx/wx.h>
 #include <wx/listctrl.h>
 #include <wx/timer.h>
+
+#include "slic3r/Utils/PrintFarm/PrintFarmClient.hpp"
 
 #include "slic3r/GUI/GUI_Utils.hpp"
 
@@ -32,13 +36,15 @@ private:
     void refresh_printers();
     void refresh_jobs();
     void on_upload(wxCommandEvent& evt);
+    void on_cancel_job(wxCommandEvent& evt);
     void on_timer(wxTimerEvent& evt);
     void set_status(const wxString& text, bool error = false);
 
-    wxListCtrl*   m_printers = nullptr;
-    wxListCtrl*   m_jobs     = nullptr;
-    wxStaticText* m_status   = nullptr;
-    wxTimer       m_timer;
+    wxListCtrl*        m_printers = nullptr;
+    wxListCtrl*        m_jobs     = nullptr;
+    wxStaticText*      m_status   = nullptr;
+    wxTimer            m_timer;
+    std::vector<PfJob> m_jobs_cache; // row-aligned with m_jobs for selection lookup
 };
 
 } // namespace GUI

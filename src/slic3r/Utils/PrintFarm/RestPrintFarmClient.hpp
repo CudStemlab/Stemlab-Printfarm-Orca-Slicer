@@ -31,6 +31,8 @@ public:
     PfResult get_printer(const std::string& id, PfPrinter& out) override;
 
     PfResult get_jobs(std::vector<PfJob>& out) override;
+    PfResult get_job(const std::string& id, PfJob& out) override;
+    PfResult cancel_job(const std::string& id) override;
 
     PfResult upload_job(const std::string& printer_id,
                         const std::string& file_path,

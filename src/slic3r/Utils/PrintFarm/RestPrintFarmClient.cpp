@@ -372,6 +372,45 @@ PfResult RestPrintFarmClient::get_jobs(std::vector<PfJob>& out)
     return result;
 }
 
+PfResult RestPrintFarmClient::get_job(const std::string& id, PfJob& out)
+{
+    // The backend exposes the queue as a list (GET /api/queue); there is no
+    // single-job endpoint, so fetch the list and select the requested row.
+    std::vector<PfJob> jobs;
+    PfResult res = get_jobs(jobs);
+    if (!res.ok)
+        return res;
+    for (auto& j : jobs) {
+        if (j.id == id) {
+            out = std::move(j);
+            return PfResult::success(res.http_status);
+        }
+    }
+    return PfResult::failure("Job no longer exists.", 404);
+}
+
+PfResult RestPrintFarmClient::cancel_job(const std::string& id)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_session_cookie.empty())
+        return PfResult::failure("Not signed in.", 401);
+    if (id.empty())
+        return PfResult::failure("No job selected.");
+
+    PfResult result = PfResult::failure("Failed to cancel the job.");
+    auto http = Http::del(api_url("/api/queue/" + Http::url_encode(id)));
+    apply_tls(http);
+    apply_session(http);
+    http.timeout_max(20)
+        .on_complete([&](std::string, unsigned status) { result = PfResult::success(status); })
+        .on_error([&](std::string b, std::string error, unsigned status) {
+            result = PfResult::failure(http_error_message(b, error, status), status);
+        })
+        .perform_sync();
+    PF_LOG(info) << "cancel_job id=" << id << (result.ok ? " ok" : " failed");
+    return result;
+}
+
 PfResult RestPrintFarmClient::upload_job(const std::string& printer_id,
                                          const std::string& file_path,
                                          const ProgressFn&  on_progress,

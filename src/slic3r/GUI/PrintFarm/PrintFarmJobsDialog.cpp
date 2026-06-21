@@ -54,9 +54,11 @@ PrintFarmJobsDialog::PrintFarmJobsDialog(wxWindow* parent)
     auto* buttons = new wxBoxSizer(wxHORIZONTAL);
     auto* refresh = new wxButton(this, wxID_REFRESH, _L("Refresh"));
     auto* upload  = new wxButton(this, wxID_ANY, _L("Upload file to farm…"));
+    auto* cancel  = new wxButton(this, wxID_ANY, _L("Cancel job"));
     auto* close   = new wxButton(this, wxID_CANCEL, _L("Close"));
     buttons->Add(refresh, 0, wxRIGHT, FromDIP(8));
     buttons->Add(upload, 0, wxRIGHT, FromDIP(8));
+    buttons->Add(cancel, 0, wxRIGHT, FromDIP(8));
     buttons->AddStretchSpacer(1);
     buttons->Add(close, 0);
     root->Add(buttons, 0, wxEXPAND | wxALL, border);
@@ -67,6 +69,7 @@ PrintFarmJobsDialog::PrintFarmJobsDialog(wxWindow* parent)
 
     refresh->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { refresh_printers(); refresh_jobs(); });
     upload->Bind(wxEVT_BUTTON, &PrintFarmJobsDialog::on_upload, this);
+    cancel->Bind(wxEVT_BUTTON, &PrintFarmJobsDialog::on_cancel_job, this);
     Bind(wxEVT_TIMER, &PrintFarmJobsDialog::on_timer, this, PF_TIMER_ID);
 
     refresh_printers();
@@ -114,6 +117,7 @@ void PrintFarmJobsDialog::refresh_jobs()
 {
     auto* client = PrintFarmManager::instance().client();
     m_jobs->DeleteAllItems();
+    m_jobs_cache.clear();
     if (!client)
         return;
     std::vector<PfJob> jobs;
@@ -122,6 +126,7 @@ void PrintFarmJobsDialog::refresh_jobs()
         set_status(wxString::FromUTF8(res.error), true);
         return;
     }
+    m_jobs_cache = jobs;
     long row = 0;
     for (const auto& j : jobs) {
         m_jobs->InsertItem(row, wxString::FromUTF8(j.name));
@@ -130,6 +135,33 @@ void PrintFarmJobsDialog::refresh_jobs()
         m_jobs->SetItem(row, 3, wxString::FromUTF8(j.submitted_at));
         ++row;
     }
+}
+
+void PrintFarmJobsDialog::on_cancel_job(wxCommandEvent& /*evt*/)
+{
+    const long sel = m_jobs->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+    if (sel < 0 || sel >= static_cast<long>(m_jobs_cache.size())) {
+        set_status(_L("Select a job to cancel."), true);
+        return;
+    }
+    const PfJob& job = m_jobs_cache[sel];
+
+    wxMessageDialog confirm(this,
+        wxString::Format(_L("Cancel the job \"%s\"?"), wxString::FromUTF8(job.name)),
+        _L("Cancel job"), wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
+    if (confirm.ShowModal() != wxID_YES)
+        return;
+
+    auto* client = PrintFarmManager::instance().client();
+    if (!client)
+        return;
+    PfResult res = client->cancel_job(job.id);
+    if (!res.ok) {
+        set_status(wxString::FromUTF8(res.error), true);
+        return;
+    }
+    set_status(_L("Job cancelled."));
+    refresh_jobs();
 }
 
 void PrintFarmJobsDialog::on_timer(wxTimerEvent& /*evt*/)

@@ -102,6 +102,9 @@ public:
 
     // ---- Jobs (session credential) ----
     virtual PfResult get_jobs(std::vector<PfJob>& out) = 0;
+    virtual PfResult get_job(const std::string& id, PfJob& out) = 0;
+    // Cancel/remove a queued job (DELETE /api/queue/{id}).
+    virtual PfResult cancel_job(const std::string& id) = 0;
 
     // ---- Print actions (Print API Key credential) ----
     // Multipart upload of a sliced file to the slicer-proxy; backend creates/starts the print.
