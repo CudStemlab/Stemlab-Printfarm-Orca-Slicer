@@ -84,6 +84,21 @@ cmake --build build --config Release --target OrcaSlicer -j 6
 macOS / Windows build instructions are unchanged from upstream OrcaSlicer — see
 the upstream [wiki](https://github.com/OrcaSlicer/OrcaSlicer/wiki/How-to-build).
 
+### Installing
+
+An AppImage is self-contained — you can just run it. For a desktop menu entry
+and icon, use the installer:
+
+```bash
+./install.sh                 # install for the current user (~/.local)
+./install.sh --system        # install for all users (uses sudo)
+./install.sh /path/to.AppImage   # install a specific AppImage
+./install.sh --uninstall     # remove it
+```
+
+With no argument it picks up the newest `build/*.AppImage`. After installing,
+launch **3D-FarmLab-Orca-Slicer** from your application menu.
+
 The displayed app name is `3D-FarmLab-Orca-Slicer`, but the user-data directory
 key is intentionally left as `OrcaSlicer`, so settings, presets and profiles are
 shared with a stock OrcaSlicer install and are not orphaned by the rebrand.
