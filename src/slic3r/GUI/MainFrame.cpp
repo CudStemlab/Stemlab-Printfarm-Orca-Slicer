@@ -2710,12 +2710,8 @@ static wxMenu* build_print_farm_menu(MainFrame* self)
         [](wxCommandEvent&) { Slic3r::GUI::PrintFarmSettingsDialog dlg(wxGetApp().mainframe); dlg.ShowModal(); },
         "", nullptr, []() { return true; }, self);
     farmMenu->AppendSeparator();
-    append_menu_item(farmMenu, wxID_ANY, _L("Log Out"), _L("Sign out of the Print Farm and clear the in-memory session"),
-        [](wxCommandEvent&) {
-            Slic3r::GUI::PrintFarmManager::instance().logout();
-            wxMessageBox(_L("You have been signed out of the Print Farm. Restart to sign in again."),
-                         _L("Print Farm"), wxOK | wxICON_INFORMATION, wxGetApp().mainframe);
-        },
+    append_menu_item(farmMenu, wxID_ANY, _L("Log Out"), _L("Sign out of the Print Farm and return to the login page"),
+        [self](wxCommandEvent&) { self->print_farm_logout(); },
         "", nullptr, []() { return Slic3r::GUI::PrintFarmManager::instance().is_logged_in(); }, self);
     return farmMenu;
 }
@@ -2750,14 +2746,29 @@ void MainFrame::show_print_farm_login()
     overlay->Raise();
     overlay->SetFocus();
 
-    // Keep the overlay covering the whole client area as the window resizes.
-    Bind(wxEVT_SIZE, [this](wxSizeEvent& e) {
-        if (m_pf_login_overlay) {
-            m_pf_login_overlay->SetSize(GetClientSize());
-            m_pf_login_overlay->Move(0, 0);
-        }
-        e.Skip();
-    });
+    // Keep the overlay covering the whole client area as the window resizes. Bound
+    // once: the overlay can be shown again after a logout, but the handler stays
+    // valid because it re-reads m_pf_login_overlay each time.
+    if (!m_pf_size_bound) {
+        m_pf_size_bound = true;
+        Bind(wxEVT_SIZE, [this](wxSizeEvent& e) {
+            if (m_pf_login_overlay) {
+                m_pf_login_overlay->SetSize(GetClientSize());
+                m_pf_login_overlay->Move(0, 0);
+            }
+            e.Skip();
+        });
+    }
+}
+
+void MainFrame::print_farm_logout()
+{
+    // Clear the in-memory session, then bring the login overlay back so the user
+    // lands on the login page again (no restart required).
+    PrintFarmManager::instance().logout();
+    if (m_plater)
+        m_plater->sidebar().update_all_preset_comboboxes();
+    show_print_farm_login();
 }
 // <<< PRINTFARM
 

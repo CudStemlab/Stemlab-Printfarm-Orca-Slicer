@@ -216,8 +216,12 @@ public:
 #endif
     // >>> PRINTFARM: show the in-window Print Farm login overlay (gates the app).
     void show_print_farm_login();
+    // Sign out of the Print Farm and bring the login overlay back so the user can
+    // sign in again without restarting the app.
+    void print_farm_logout();
 private:
     wxWindow* m_pf_login_overlay = nullptr;
+    bool      m_pf_size_bound    = false; // size handler for the overlay bound once
 public:
     // <<< PRINTFARM
     //BBS GUI refactor

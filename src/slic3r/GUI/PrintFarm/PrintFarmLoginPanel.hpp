@@ -12,6 +12,9 @@
 #include <wx/wx.h>
 #include <wx/panel.h>
 
+class Button;
+class TextInput;
+
 namespace Slic3r {
 namespace GUI {
 
@@ -27,13 +30,14 @@ public:
 private:
     void on_sign_in(wxCommandEvent& evt);
     void set_busy(bool busy);
+    void set_error(const wxString& msg);
 
-    wxTextCtrl*   m_server_url = nullptr; // shown only when no URL is configured yet
-    wxTextCtrl*   m_email      = nullptr;
-    wxTextCtrl*   m_password   = nullptr;
+    TextInput*    m_server_url = nullptr; // editable so the backend can be re-pointed
+    TextInput*    m_email      = nullptr;
+    TextInput*    m_password   = nullptr;
     wxStaticText* m_error      = nullptr;
-    wxButton*     m_sign_in    = nullptr;
-    wxButton*     m_quit       = nullptr;
+    Button*       m_sign_in    = nullptr;
+    Button*       m_quit       = nullptr;
 
     std::function<void()> m_on_success;
     std::function<void()> m_on_quit;
