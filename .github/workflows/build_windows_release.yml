@@ -25,13 +25,16 @@ jobs:
           lfs: 'false'
 
       - name: Setup MSVC
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Install NSIS
         run: choco install nsis -y
 
       # Reuse the dependency build cached by the main "Build all" CI (same key/path),
-      # so deps (~1h) are restored instead of rebuilt. Same VS toolchain, no change needed.
+      # so deps (~1h) are restored instead of rebuilt. Use build_release_vs.bat (the
+      # script the main build_orca.yml CI uses) — it builds the slicer against the
+      # cached deps successfully, whereas build_release_vs2022.bat hit an OpenCV
+      # "no compatible binaries" config error against the same cache.
       - name: Restore dependency cache
         id: deps-cache
         uses: actions/cache@v5
@@ -42,11 +45,11 @@ jobs:
       - name: Build dependencies (cache miss only)
         if: steps.deps-cache.outputs.cache-hit != 'true'
         working-directory: ${{ github.workspace }}
-        run: .\build_release_vs2022.bat deps
+        run: .\build_release_vs.bat deps
 
       - name: Build slicer
         working-directory: ${{ github.workspace }}
-        run: .\build_release_vs2022.bat slicer
+        run: .\build_release_vs.bat slicer
 
       - name: Create installer
         working-directory: ${{ github.workspace }}/build
