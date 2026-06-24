@@ -1051,15 +1051,32 @@ void PlaterPresetComboBox::select_farm_printer(int farm_idx)
                std::equal(a.begin(), a.end(), b.begin(),
                           [](char x, char y) { return std::tolower((unsigned char) x) == std::tolower((unsigned char) y); });
     };
+    // Among presets matching the farm printer's model, prefer the 0.4 mm nozzle
+    // variant (the stock default), then a compatible one. Without this, the first
+    // visible match wins -- e.g. the H2D's 0.2 nozzle profile -- which would slice
+    // for the wrong nozzle. Scan all matches rather than breaking early so the 0.4
+    // variant is found even when a smaller-nozzle preset precedes it.
     std::string match;
+    bool        match_default_nozzle = false; // current best is the 0.4 variant
+    bool        match_compatible     = false; // current best is compatible
     for (const Preset& preset : m_collection->get_presets()) {
         if (preset.is_default || !preset.is_visible)
             continue;
         const std::string model = preset.config.opt_string("printer_model");
-        if (!farm.model.empty() && ieq(model, farm.model)) {
-            match = preset.name;
-            if (preset.is_compatible)
-                break; // prefer a compatible match
+        if (farm.model.empty() || !ieq(model, farm.model))
+            continue;
+        const bool is_default_nozzle = preset.config.opt_string("printer_variant") == "0.4";
+        const bool is_compatible     = preset.is_compatible;
+        // Rank: 0.4 nozzle first, then compatibility. Keep the first match as a floor.
+        const bool better = match.empty() ||
+            (is_default_nozzle != match_default_nozzle ? is_default_nozzle :
+             (is_compatible != match_compatible ? is_compatible : false));
+        if (better) {
+            match                = preset.name;
+            match_default_nozzle = is_default_nozzle;
+            match_compatible     = is_compatible;
+            if (match_default_nozzle && match_compatible)
+                break; // best possible: compatible 0.4 nozzle preset
         }
     }
 
@@ -1080,6 +1097,48 @@ void PlaterPresetComboBox::select_farm_printer(int farm_idx)
     BOOST_LOG_TRIVIAL(info) << "[printfarm] farm printer '" << farm.name << "' -> profile '" << match << "'";
     if (Tab* tab = wxGetApp().get_tab(Preset::TYPE_PRINTER))
         tab->select_preset(match);
+
+    // Default the process to a 0.2 mm "Standard" layer-height profile for the matched
+    // printer. Switching the printer can leave a finer/coarser process selected; the
+    // farm's normal quality is a 0.2 mm layer height. Run after the printer switch so
+    // the prints' compatibility flags are up to date. Several 0.2 mm presets exist per
+    // printer (Standard, Strength, Support, ...), so rank: prefer a name containing
+    // "Standard" (e.g. "0.20mm Standard @BBL H2D", "0.20 Standard @Snapmaker U1"), then
+    // a stock system preset over user variants. First match is kept as a floor.
+    auto name_has_standard = [](const std::string& n) {
+        std::string l = n;
+        std::transform(l.begin(), l.end(), l.begin(),
+                       [](unsigned char c) { return (char) std::tolower(c); });
+        return l.find("standard") != std::string::npos;
+    };
+    std::string print_match;
+    bool        print_is_standard = false;
+    bool        print_is_system   = false;
+    for (const Preset& preset : m_preset_bundle->prints.get_presets()) {
+        if (preset.is_default || !preset.is_visible || !preset.is_compatible)
+            continue;
+        const double lh = preset.config.opt_float("layer_height");
+        if (lh < 0.1995 || lh > 0.2005)
+            continue;
+        const bool is_standard = name_has_standard(preset.name);
+        const bool is_system   = preset.is_system;
+        const bool better = print_match.empty() ||
+            (is_standard != print_is_standard ? is_standard :
+             (is_system != print_is_system ? is_system : false));
+        if (better) {
+            print_match       = preset.name;
+            print_is_standard = is_standard;
+            print_is_system   = is_system;
+            if (print_is_standard && print_is_system)
+                break; // best: a stock 0.2 mm "Standard" process preset
+        }
+    }
+    if (!print_match.empty()) {
+        BOOST_LOG_TRIVIAL(info) << "[printfarm] default process -> '" << print_match << "' (0.2 mm)";
+        if (Tab* ptab = wxGetApp().get_tab(Preset::TYPE_PRINT))
+            ptab->select_preset(print_match);
+    }
+
     this->CallAfter([this, id]() {
         auto it = std::find(m_farm_ids.begin(), m_farm_ids.end(), id);
         if (m_first_farm_idx && it != m_farm_ids.end())
