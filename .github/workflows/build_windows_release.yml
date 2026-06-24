@@ -41,12 +41,20 @@ jobs:
       # recipes), NOT 'deps/**': the post-job cache-save re-evaluates this key after
       # deps/build is populated (~187k artifact files), and hashFiles('deps/**') over
       # that times out (>120s), failing the job even though the build succeeded.
+      #
+      # CACHE_VERSION is a manual toolchain epoch: the windows-2022 image's MSVC
+      # toolset drifts over time, but the recipe-file hash above does NOT change with
+      # it, so a cache built by an older toolset can be linked into a build by a newer
+      # one -> ABI mismatch -> a release binary that launches to a frozen main window.
+      # Bump CACHE_VERSION to force a clean deps rebuild whenever that is suspected.
       - name: Restore dependency cache
         id: deps-cache
         uses: actions/cache@v5
+        env:
+          CACHE_VERSION: v2
         with:
           path: ${{ github.workspace }}/deps/build/OrcaSlicer_dep
-          key: windows-release-deps-${{ hashFiles('deps/CMakeLists.txt', 'deps/deps-*.cmake', 'deps/*/*.cmake') }}
+          key: windows-release-deps-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ hashFiles('deps/CMakeLists.txt', 'deps/deps-*.cmake', 'deps/*/*.cmake') }}
 
       - name: Build dependencies (cache miss only)
         if: steps.deps-cache.outputs.cache-hit != 'true'
