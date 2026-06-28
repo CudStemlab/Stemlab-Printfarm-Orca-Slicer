@@ -22,9 +22,11 @@ class PrintFarmLoginPanel : public wxPanel
 {
 public:
     // on_success: invoked after a successful login (session + printers + token).
+    // on_skip:    invoked when the user chooses to use the app without logging in.
     // on_quit:    invoked when the user chooses to quit the app.
     PrintFarmLoginPanel(wxWindow*             parent,
                         std::function<void()> on_success,
+                        std::function<void()> on_skip,
                         std::function<void()> on_quit);
 
 private:
@@ -37,9 +39,11 @@ private:
     TextInput*    m_password   = nullptr;
     wxStaticText* m_error      = nullptr;
     Button*       m_sign_in    = nullptr;
+    Button*       m_skip       = nullptr;
     Button*       m_quit       = nullptr;
 
     std::function<void()> m_on_success;
+    std::function<void()> m_on_skip;
     std::function<void()> m_on_quit;
 };
 

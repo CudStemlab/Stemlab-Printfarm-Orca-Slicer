@@ -2732,21 +2732,32 @@ void MainFrame::show_print_farm_login()
     if (m_pf_login_overlay != nullptr || PrintFarmManager::instance().is_logged_in())
         return;
 
+    auto restore_ui = [this]() {
+        for (auto& [win, was_shown] : m_pf_hidden_windows)
+            if (win) win->Show(was_shown);
+        m_pf_hidden_windows.clear();
+        if (m_pf_login_overlay) {
+            m_pf_login_overlay->Destroy();
+            m_pf_login_overlay = nullptr;
+        }
+        Layout();
+    };
+
     auto* overlay = new PrintFarmLoginPanel(
         this,
-        [this]() { // on success: restore the app UI and surface the synced printers
-            for (auto& [win, was_shown] : m_pf_hidden_windows)
-                if (win) win->Show(was_shown);
-            m_pf_hidden_windows.clear();
-            if (m_pf_login_overlay) {
-                m_pf_login_overlay->Destroy();
-                m_pf_login_overlay = nullptr;
-            }
-            Layout();
-            if (m_plater)
+        [this, restore_ui]() { // on success: restore the app UI and surface the synced printers
+            restore_ui();
+            if (m_plater) {
                 m_plater->sidebar().update_all_preset_comboboxes();
+                const std::string sync_err = PrintFarmManager::instance().last_sync_error();
+                if (!sync_err.empty()) {
+                    m_plater->get_notification_manager()->push_plater_warning_notification(
+                        "Print Farm: Could not load printers — " + sync_err);
+                }
+            }
         },
-        [this]() { Close(true); }); // on quit: exit the app
+        [restore_ui]() { restore_ui(); }, // on skip: restore UI, run as normal slicer
+        [this]() { Close(true); });       // on quit: exit the app
 
     m_pf_login_overlay = overlay;
 

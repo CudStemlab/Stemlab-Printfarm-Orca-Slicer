@@ -521,9 +521,12 @@ void PresetComboBox::add_farm_printers()
     m_farm_ids.clear();
 
     auto& mgr = Slic3r::GUI::PrintFarmManager::instance();
-    if (!mgr.is_logged_in())
+    if (!mgr.is_logged_in()) {
+        BOOST_LOG_TRIVIAL(info) << "[printfarm] add_farm_printers: not logged in";
         return;
+    }
     const auto printers = mgr.printers();
+    BOOST_LOG_TRIVIAL(info) << "[printfarm] add_farm_printers: " << printers.size() << " printer(s) in manager";
     if (printers.empty())
         return;
 

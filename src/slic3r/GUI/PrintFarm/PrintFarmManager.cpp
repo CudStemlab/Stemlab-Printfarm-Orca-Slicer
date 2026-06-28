@@ -240,11 +240,22 @@ PfResult PrintFarmManager::refresh_printers()
 
     std::vector<PfPrinter> fetched;
     PfResult res = client->get_printers(fetched);
-    if (res.ok) {
+    {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_printers = std::move(fetched);
+        if (res.ok) {
+            m_printers = std::move(fetched);
+            m_last_sync_error.clear();
+        } else {
+            m_last_sync_error = res.error;
+        }
     }
     return res;
+}
+
+std::string PrintFarmManager::last_sync_error() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_last_sync_error;
 }
 
 std::vector<PfPrinter> PrintFarmManager::printers() const

@@ -465,6 +465,11 @@ void Http::priv::http_perform()
 	if (!postfields.empty()) {
 		::curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postfields.c_str());
 		::curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, postfields.size());
+	} else if (method == "POST" && form == nullptr && mime == nullptr && putFile == nullptr) {
+		// POST with no body source: send a zero-length body so libcurl does not
+		// fall back to reading from stdin via READFUNCTION/READDATA.
+		::curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+		::curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, 0L);
 	}
 
 	CURLcode res = ::curl_easy_perform(curl);

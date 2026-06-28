@@ -34,9 +34,11 @@ static const wxColour kError    (224, 86, 86);
 
 PrintFarmLoginPanel::PrintFarmLoginPanel(wxWindow*             parent,
                                          std::function<void()> on_success,
+                                         std::function<void()> on_skip,
                                          std::function<void()> on_quit)
     : wxPanel(parent, wxID_ANY)
     , m_on_success(std::move(on_success))
+    , m_on_skip(std::move(on_skip))
     , m_on_quit(std::move(on_quit))
 {
     auto& mgr = PrintFarmManager::instance();
@@ -136,6 +138,11 @@ PrintFarmLoginPanel::PrintFarmLoginPanel(wxWindow*             parent,
     m_sign_in->SetMinSize(wxSize(-1, FromDIP(38)));
     card_sizer->Add(m_sign_in, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, hpad);
 
+    m_skip = new Button(card, _L("Use without login"));
+    m_skip->SetStyle(ButtonStyle::Regular, ButtonType::Window);
+    m_skip->SetMinSize(wxSize(-1, FromDIP(34)));
+    card_sizer->Add(m_skip, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, hpad);
+
     m_quit = new Button(card, _L("Quit"));
     m_quit->SetStyle(ButtonStyle::Regular, ButtonType::Window);
     m_quit->SetMinSize(wxSize(-1, FromDIP(34)));
@@ -156,7 +163,16 @@ PrintFarmLoginPanel::PrintFarmLoginPanel(wxWindow*             parent,
     SetSizer(root);
 
     m_sign_in->Bind(wxEVT_BUTTON, &PrintFarmLoginPanel::on_sign_in, this);
-    m_quit->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { if (m_on_quit) m_on_quit(); });
+    // Copy callbacks out of `this` before deferring: the CallAfter fires after GTK has
+    // finished dispatching the button-release event, by which point the panel may already
+    // be destroyed. Holding a captured-by-value copy of the std::function keeps the
+    // closure alive independently of the panel's lifetime.
+    m_skip->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        if (m_on_skip) { auto cb = m_on_skip; CallAfter([cb]() { cb(); }); }
+    });
+    m_quit->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        if (m_on_quit) { auto cb = m_on_quit; CallAfter([cb]() { cb(); }); }
+    });
     // Enter from any field submits.
     for (TextInput* in : {m_server_url, m_email, m_password})
         in->GetTextCtrl()->Bind(wxEVT_TEXT_ENTER, &PrintFarmLoginPanel::on_sign_in, this);
@@ -218,8 +234,7 @@ void PrintFarmLoginPanel::on_sign_in(wxCommandEvent& /*evt*/)
     set_busy(false);
 
     if (res.ok) {
-        if (m_on_success)
-            m_on_success();
+        if (m_on_success) { auto cb = m_on_success; CallAfter([cb]() { cb(); }); }
         return;
     }
     set_error(wxString::FromUTF8(res.error.empty() ? "Login failed." : res.error));
